@@ -1,6 +1,5 @@
 #include "server.h"
 
-#include <asm-generic/errno.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -15,8 +14,6 @@
 
 #define MAX_EVENTS 10
 #define BUFFER_SIZE 1024
-
-void hello_from_c() { printf("Hello World! (from c)\n"); }
 
 static void close_client(int client_fd, int epoll_fd) {
   epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);

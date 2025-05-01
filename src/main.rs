@@ -8,13 +8,11 @@ use libc::*;
 
 #[link(name = "server", kind = "static")]
 unsafe extern "C" {
-    fn hello_from_c();
     fn start_server(port: c_int, shutdown_event_fd: c_int) -> c_int;
 }
 
 fn main() -> Result<()> {
     println!("Starting");
-    unsafe { hello_from_c() };
     let shutdown_event_fd: RawFd = unsafe {
         eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK)
     };
