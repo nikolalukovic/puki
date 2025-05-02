@@ -1,10 +1,10 @@
+use libc::*;
+use std::io::Result;
 use std::io::Write;
-use std::time::Duration;
-use std::thread;
 use std::os::fd::FromRawFd;
 use std::os::fd::RawFd;
-use std::io::Result;
-use libc::*;
+use std::thread;
+use std::time::Duration;
 
 #[link(name = "server", kind = "static")]
 unsafe extern "C" {
@@ -13,9 +13,7 @@ unsafe extern "C" {
 
 fn main() -> Result<()> {
     println!("Starting");
-    let shutdown_event_fd: RawFd = unsafe {
-        eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK)
-    };
+    let shutdown_event_fd: RawFd = unsafe { eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK) };
 
     if shutdown_event_fd == -1 {
         eprintln!("eventfd: {}", std::io::Error::last_os_error());
@@ -37,14 +35,14 @@ fn main() -> Result<()> {
     let signal_value: u64 = 1;
     match shutdown_event_fd_file.write_all(&signal_value.to_ne_bytes()) {
         Ok(_) => println!("Shutdown"),
-        Err(e) => eprintln!("Shutdown error: {}", e)
+        Err(e) => eprintln!("Shutdown error: {}", e),
     }
 
     let _ = shutdown_event_fd_file.flush();
 
     match server_handle.join() {
         Ok(_) => println!("Done"),
-        Err(e) => eprintln!("Error: {:?}", e)
+        Err(e) => eprintln!("Error: {:?}", e),
     };
 
     Ok(())

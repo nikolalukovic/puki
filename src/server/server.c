@@ -1,5 +1,6 @@
 #include "server.h"
 
+#include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -16,6 +17,18 @@
 #define BUFFER_SIZE 1024
 
 static void close_client(int client_fd, int epoll_fd) {
+  struct sockaddr_in peer_addr;
+  socklen_t peer_len = sizeof(peer_addr);
+  char peer_ip[INET_ADDRSTRLEN];
+  int peer_port = 0;
+
+  if (getpeername(client_fd, &peer_addr, &peer_len) == 0) {
+    inet_ntop(AF_INET, &peer_addr.sin_addr, peer_ip, INET_ADDRSTRLEN);
+    peer_port = ntohs(peer_addr.sin_port);
+  }
+
+  printf("Client disconnected: %s:%d (fd: %d)\n", peer_ip, peer_port, client_fd);
+
   epoll_ctl(epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
   close(client_fd);
 }
@@ -104,6 +117,7 @@ int start_server(int port, int shutdown_event_fd) {
         while (true) {
           struct sockaddr_in client_addr;
           socklen_t client_len = sizeof(client_addr);
+          char client_ip[INET_ADDRSTRLEN];
 
           int conn_sock = accept4(listen_sock, (struct sockaddr *)&client_addr,
                                   &client_len, SOCK_NONBLOCK);
@@ -115,6 +129,11 @@ int start_server(int port, int shutdown_event_fd) {
               break;
             }
           }
+
+          getpeername(conn_sock, &client_addr, &client_len);
+          inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
+
+          printf("New connection from %s:%d\n", client_ip, ntohs(client_addr.sin_port));
 
           ev.events = EPOLLIN | EPOLLRDHUP;
           ev.data.fd = conn_sock;
@@ -135,8 +154,21 @@ int start_server(int port, int shutdown_event_fd) {
         if (current_events & EPOLLIN) {
           ssize_t bytes_read = read(client_fd, buffer, BUFFER_SIZE - 1);
           if (bytes_read > 0) {
-            printf("Received %zd bytes from fd %d: %.*s\n", bytes_read,
-                   client_fd, (int)bytes_read, buffer);
+            struct sockaddr_in peer_addr;
+            socklen_t peer_len = sizeof(peer_addr);
+            char peer_ip[INET_ADDRSTRLEN];
+            int peer_port = 0;
+
+            if (getpeername(client_fd, &peer_addr, &peer_len) == 0) {
+              inet_ntop(AF_INET, &peer_addr.sin_addr, peer_ip, INET_ADDRSTRLEN);
+              peer_port = ntohs(peer_addr.sin_port);
+            } else {
+              strncpy(peer_ip, "unknown", INET_ADDRSTRLEN);
+            }
+
+            printf("Got %zd bytes from %s:%d: %.*s\n", bytes_read, peer_ip,
+                   peer_port, (int)bytes_read, buffer);
+
             ssize_t bytes_written = write(client_fd, buffer, bytes_read);
             if (bytes_written < 0) {
               if (errno == EAGAIN || errno == EWOULDBLOCK) {
