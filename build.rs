@@ -1,14 +1,24 @@
 extern crate cc;
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/server/server.c");
-    println!("cargo:rerun-if-changed=src/server/server/h");
+    let profile = std::env::var("PROFILE").unwrap();
+    let mut build = cc::Build::new();
 
-    cc::Build::new()
-        .file("src/server/server.c")
-        .include("src/server")
+    if profile == "debug" || profile == "dev" || profile == "test" {
+        build.define("DEBUG", None);
+    }
+
+    println!("cargo:rerun-if-changed=src/internal/pk_log.c");
+    println!("cargo:rerun-if-changed=src/internal/pk_server.c");
+    println!("cargo:rerun-if-changed=src/internal/pk_server.h");
+
+    build
+        .file("src/internal/pk_server.c")
+        .file("src/internal/pk_server.h")
+        .file("src/internal/pk_log.c")
+        .include("src/internal")
         .define("_GNU_SOURCE", None)
-        .compile("server");
+        .compile("pk_server");
 
-    println!("cargo:rustc-link-lib=static=server");
+    println!("cargo:rustc-link-lib=static=pk_server");
 }

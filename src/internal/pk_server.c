@@ -1,4 +1,5 @@
-#include "server.h"
+#include "pk_server.h"
+#include "pk_log.c"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -11,6 +12,8 @@
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/socket.h>
+#include <sys/syslog.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #define MAX_EVENTS 10
@@ -26,12 +29,12 @@ static void close_client(int client_fd, int epoll_fd) {
   char peer_ip[INET_ADDRSTRLEN];
   int peer_port = 0;
 
-  if (getpeername(client_fd, &peer_addr, &peer_len) == 0) {
+  if (getpeername(client_fd, (struct sockaddr *)&peer_addr, &peer_len) == 0) {
     inet_ntop(AF_INET, &peer_addr.sin_addr, peer_ip, INET_ADDRSTRLEN);
     peer_port = ntohs(peer_addr.sin_port);
   }
 
-  printf("Client disconnected: %s:%d (fd: %d)\n", peer_ip, peer_port,
+  pk_log(LOG_INFO, "Client disconnected: %s:%d (fd: %d)\n", peer_ip, peer_port,
          client_fd);
 
   if (close_cb) {
@@ -56,9 +59,11 @@ int start_server(int port, int shutdown_event_fd,
   data_cb = data_cb_in;
   close_cb = close_cb_in;
 
+  openlog("puki", LOG_PID | LOG_NDELAY, LOG_USER);  
+
   listen_sock = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
   if (listen_sock < 0) {
-    perror("socket");
+    pk_log_error("socket");
     return -1;
   }
 
@@ -72,20 +77,20 @@ int start_server(int port, int shutdown_event_fd,
 
   if (bind(listen_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) <
       0) {
-    perror("bind");
+    pk_log_error("bind");
     close(listen_sock);
     return -1;
   }
 
   if (listen(listen_sock, SOMAXCONN) < 0) {
-    perror("listen");
+    pk_log_error("listen");
     close(listen_sock);
     return -1;
   }
 
   epoll_fd = epoll_create1(0);
   if (epoll_fd < 0) {
-    perror("epoll_create1");
+    pk_log_error("epoll_create1");
     close(listen_sock);
     return -1;
   }
@@ -93,7 +98,7 @@ int start_server(int port, int shutdown_event_fd,
   ev.events = EPOLLIN;
   ev.data.fd = listen_sock;
   if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, listen_sock, &ev) < 0) {
-    perror("epoll_ctl");
+    pk_log_error("epoll_ctl");
     close(epoll_fd);
     close(listen_sock);
     return -1;
@@ -102,7 +107,7 @@ int start_server(int port, int shutdown_event_fd,
   ev.events = EPOLLIN;
   ev.data.fd = shutdown_event_fd;
   if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, shutdown_event_fd, &ev) < 0) {
-    perror("epoll_ctl");
+    pk_log_error("epoll_ctl");
     close(epoll_fd);
     close(listen_sock);
     return -1;
@@ -114,7 +119,7 @@ int start_server(int port, int shutdown_event_fd,
       if (errno == EINTR)
         continue;
 
-      perror("epoll_wait");
+      pk_log_error("epoll_wait");
       break;
     }
 
@@ -139,7 +144,7 @@ int start_server(int port, int shutdown_event_fd,
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
               break;
             } else {
-              perror("accept4");
+              pk_log_error("accept4");
               break;
             }
           }
@@ -147,13 +152,13 @@ int start_server(int port, int shutdown_event_fd,
           getpeername(conn_sock, &client_addr, &client_len);
           inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
 
-          printf("New connection from %s:%d\n", client_ip,
+          pk_log(LOG_INFO,"New connection from %s:%d\n", client_ip,
                  ntohs(client_addr.sin_port));
 
           ev.events = EPOLLIN | EPOLLRDHUP;
           ev.data.fd = conn_sock;
           if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, conn_sock, &ev) < 0) {
-            perror("epoll_ctl");
+            pk_log_error("epoll_ctl");
             close(conn_sock);
           }
           if (new_conn_cb != NULL) {
@@ -185,7 +190,7 @@ int start_server(int port, int shutdown_event_fd,
               strncpy(peer_ip, "unknown", INET_ADDRSTRLEN);
             }
 
-            printf("Got %zd bytes from %s:%d: %.*s\n", bytes_read, peer_ip,
+            pk_log(LOG_INFO,"Got %zd bytes from %s:%d: %.*s\n", bytes_read, peer_ip,
                    peer_port, (int)bytes_read, buffer);
 
             if (data_cb != NULL) {
@@ -196,7 +201,7 @@ int start_server(int port, int shutdown_event_fd,
             if (bytes_written < 0) {
               if (errno == EAGAIN || errno == EWOULDBLOCK) {
               } else {
-                perror("C: write failed");
+                pk_log_error("C: write failed");
                 close_client(client_fd, epoll_fd);
               }
             } else if (bytes_written < bytes_read) {
@@ -207,7 +212,7 @@ int start_server(int port, int shutdown_event_fd,
             if (errno == EAGAIN || errno == EWOULDBLOCK) {
 
             } else {
-              perror("read");
+              pk_log_error("read");
               close_client(client_fd, epoll_fd);
             }
           }
@@ -218,6 +223,8 @@ int start_server(int port, int shutdown_event_fd,
 
   close(listen_sock);
   close(epoll_fd);
+
+  closelog();
 
   return 0;
 }

@@ -8,7 +8,9 @@ use std::slice;
 use std::thread;
 use std::time::Duration;
 
-#[link(name = "server", kind = "static")]
+mod logger;
+
+#[link(name = "pk_server", kind = "static")]
 unsafe extern "C" {
     fn start_server(
         port: c_int,
@@ -24,7 +26,7 @@ extern "C" fn handle_new_connection(fd: c_int, ip_addr_net: u32, port_net: u16) 
     let ip_addr = Ipv4Addr::from(u32::from_be(ip_addr_net));
     let port = u16::from_be(port_net);
 
-    println!("[Rust]: fd={}, addr={}:{}", fd, ip_addr, port);
+    log::info!("fd={}, addr={}:{}", fd, ip_addr, port);
 }
 
 #[unsafe(no_mangle)]
@@ -33,20 +35,27 @@ extern "C" fn handle_new_data(fd: c_int, data_ptr: *const u8, len: size_t) {
 
     let data_str = String::from_utf8_lossy(data_slices);
 
-    println!("[Rust]: received data: fd={}, data={}", fd, data_str);
+    log::info!("Received data: fd={}, data={}", fd, data_str);
 }
 
 #[unsafe(no_mangle)]
 extern "C" fn handle_closed_connection(fd: c_int) {
-    println!("[Rust]: connection closed: fd={}", fd);
+    log::info!("connection closed: fd={}", fd);
 }
 
 fn main() -> Result<()> {
-    println!("Starting");
+    #[cfg(debug_assertions)]
+    logger::init_logger(true);
+
+    #[cfg(not(debug_assertions))]
+    logger::init_logger(false);
+
+    log::info!("Starting...");
+
     let shutdown_event_fd: RawFd = unsafe { eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK) };
 
     if shutdown_event_fd == -1 {
-        eprintln!("eventfd: {}", std::io::Error::last_os_error());
+        log::error!("eventfd: {}", std::io::Error::last_os_error());
         return Err(std::io::Error::last_os_error());
     }
 
@@ -64,7 +73,7 @@ fn main() -> Result<()> {
         };
 
         if result != 0 {
-            eprintln!("start_server: {}", std::io::Error::last_os_error());
+            log::error!("start_server: {}", std::io::Error::last_os_error());
         }
     });
 
@@ -72,15 +81,15 @@ fn main() -> Result<()> {
 
     let signal_value: u64 = 1;
     match shutdown_event_fd_file.write_all(&signal_value.to_ne_bytes()) {
-        Ok(_) => println!("Shutdown"),
-        Err(e) => eprintln!("Shutdown error: {}", e),
+        Ok(_) => log::info!("Shutdown"),
+        Err(e) => log::error!("Shutdown error: {}", e),
     }
 
     let _ = shutdown_event_fd_file.flush();
 
     match server_handle.join() {
-        Ok(_) => println!("Done"),
-        Err(e) => eprintln!("Error: {:?}", e),
+        Ok(_) => log::info!("Done"),
+        Err(e) => log::error!("Error: {:?}", e),
     };
 
     Ok(())

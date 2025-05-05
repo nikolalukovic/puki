@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 libc = "0.2.172" 
+log = "0.4.27"
+syslog = "7.0.0"
 
 [build-dependencies]
 cc = "1.2.20"

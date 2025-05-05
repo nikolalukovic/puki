@@ -1,5 +1,5 @@
-#ifndef SERVER_H
-#define SERVER_H
+#ifndef PK_SERVER_H
+#define PK_SERVER_H
 
 #include <stddef.h>
 #include <stdint.h>
