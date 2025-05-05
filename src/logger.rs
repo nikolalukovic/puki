@@ -17,18 +17,18 @@ impl Log for DualLogger {
         if self.enabled(record.metadata()) {
             let message = format!("{}:{}", record.level(), record.args());
 
-            let mut logger = self.syslog_logger.lock().unwrap();
-
-            match record.level() {
-                Level::Info => logger.info(&message).unwrap(),
-                Level::Error => logger.err(&message).unwrap(),
-                Level::Warn => logger.warning(&message).unwrap(),
-                Level::Debug => logger.debug(&message).unwrap(),
-                Level::Trace => logger.debug(&message).unwrap(),
-            }
-
             if self.stdout_enabled {
                 println!("{}", message);
+            } else {
+                let mut logger = self.syslog_logger.lock().unwrap();
+
+                match record.level() {
+                    Level::Info => logger.info(record.args()).unwrap(),
+                    Level::Error => logger.err(record.args()).unwrap(),
+                    Level::Warn => logger.warning(record.args()).unwrap(),
+                    Level::Debug => logger.debug(record.args()).unwrap(),
+                    Level::Trace => logger.debug(record.args()).unwrap(),
+                }
             }
         }
     }
