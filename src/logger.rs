@@ -3,12 +3,12 @@ use std::sync::Mutex;
 use log::{Level, Log, Metadata, Record};
 use syslog::{Facility, Formatter3164, Logger, LoggerBackend};
 
-pub struct DualLogger {
+pub struct PukiLogger {
     syslog_logger: Mutex<Logger<LoggerBackend, Formatter3164>>,
     stdout_enabled: bool,
 }
 
-impl Log for DualLogger {
+impl Log for PukiLogger {
     fn enabled(&self, _: &Metadata) -> bool {
         true
     }
@@ -46,7 +46,7 @@ pub fn init_logger(stdout_enabled: bool) {
 
     let syslog_logger = syslog::unix(formatter).expect("Could not connect to syslog");
 
-    let logger = Box::new(DualLogger {
+    let logger = Box::new(PukiLogger {
         syslog_logger: Mutex::new(syslog_logger),
         stdout_enabled,
     });
