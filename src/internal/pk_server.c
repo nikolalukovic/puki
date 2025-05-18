@@ -152,7 +152,7 @@ int start_server(int port, int shutdown_event_fd,
           getpeername(conn_sock, &client_addr, &client_len);
           inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
 
-          pk_log(LOG_INFO,"New connection from %s:%d\n", client_ip,
+          pk_log(LOG_INFO,"New connection from %s:%d", client_ip,
                  ntohs(client_addr.sin_port));
 
           ev.events = EPOLLIN | EPOLLRDHUP;
@@ -190,7 +190,7 @@ int start_server(int port, int shutdown_event_fd,
               strncpy(peer_ip, "unknown", INET_ADDRSTRLEN);
             }
 
-            pk_log(LOG_INFO,"Got %zd bytes from %s:%d: %.*s\n", bytes_read, peer_ip,
+            pk_log(LOG_INFO,"Got %zd bytes from %s:%d: %.*s", bytes_read, peer_ip,
                    peer_port, (int)bytes_read, buffer);
 
             if (data_cb != NULL) {
@@ -201,7 +201,7 @@ int start_server(int port, int shutdown_event_fd,
             if (bytes_written < 0) {
               if (errno == EAGAIN || errno == EWOULDBLOCK) {
               } else {
-                pk_log_error("C: write failed");
+                pk_log_error("write failed");
                 close_client(client_fd, epoll_fd);
               }
             } else if (bytes_written < bytes_read) {

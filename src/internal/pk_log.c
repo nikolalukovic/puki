@@ -1,18 +1,35 @@
 #include <stdio.h>
 #include <sys/syslog.h>
-#include <syslog.h>
 #include <stdarg.h>
 #include <errno.h>
 #include <string.h>
+
+#define MAX_LOG_MESSAGE_LEN 2048
+#define MAX_ERROR_MSG_LEN 256
+
+static const char* priority_to_str(int priority) {
+  switch (priority) {
+    case LOG_EMERG: return "EMERG";
+    case LOG_ALERT: return "ALERT";
+    case LOG_CRIT: return "CRIT";
+    case LOG_ERR: return "ERR";
+    case LOG_WARNING: return "WARN";
+    case LOG_NOTICE: return "NOTICE";
+    case LOG_INFO: return "INFO";
+    case LOG_DEBUG: return "DEBUG";
+    default: return "UNKNOWN";
+  }
+}
 
 void pk_log(int priority, const char* message, ...) {
   va_list args;
   va_start(args, message);
 
+  const char* prio_str = priority_to_str(priority);
+
   #ifdef DEBUG
-  (void) priority;
+  printf("%s:", prio_str); 
   vprintf(message, args);
-  printf("\n");
   #else
   vsyslog(priority, message, args);
   #endif
