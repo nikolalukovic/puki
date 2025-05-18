@@ -16,8 +16,6 @@ fn main() -> Result<()> {
     #[cfg(not(debug_assertions))]
     logger::init_logger(false);
 
-    log::info!("Starting...");
-
     let (sender, receiver): (Sender<()>, Receiver<()>) = mpsc::channel();
 
     ctrlc::set_handler(move || {
@@ -30,7 +28,7 @@ fn main() -> Result<()> {
     let server_handle = internal::init_server(8080, shutdown_event_fd);
 
     receiver.recv().expect("Failed to receive signal");
-    
+
     if shutdown_event_fd == -1 {
         log::error!("eventfd: {}", std::io::Error::last_os_error());
         return Err(std::io::Error::last_os_error());
@@ -39,17 +37,15 @@ fn main() -> Result<()> {
     let mut shutdown_event_fd_file = unsafe { std::fs::File::from_raw_fd(shutdown_event_fd) };
 
     let signal_value: u64 = 1;
-    match shutdown_event_fd_file.write_all(&signal_value.to_ne_bytes()) {
-        Ok(_) => log::info!("Shutdown"),
-        Err(e) => log::error!("Shutdown error: {}", e),
-    }
+    shutdown_event_fd_file
+        .write_all(&signal_value.to_ne_bytes())
+        .expect("Failed to write to shutdown_event_fd");
 
     let _ = shutdown_event_fd_file.flush();
 
-    match server_handle.join() {
-        Ok(_) => log::info!("Done"),
-        Err(e) => log::error!("Error: {:?}", e),
-    };
+    server_handle.join().expect("Failed to join server thread");
+
+    log::info!("Bye");
 
     Ok(())
 }

@@ -113,6 +113,8 @@ int start_server(int port, int shutdown_event_fd,
     return -1;
   }
 
+  pk_log(LOG_INFO, "Listening on port: %d\n", port);
+
   while (running) {
     int nfds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
     if (nfds < 0) {
