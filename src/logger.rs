@@ -1,4 +1,4 @@
-use std::sync::Mutex;
+use std::{io::Write as _, sync::Mutex};
 
 use log::{Level, Log, Metadata, Record};
 use syslog::{Facility, Formatter3164, Logger, LoggerBackend};
@@ -33,7 +33,11 @@ impl Log for PukiLogger {
         }
     }
 
-    fn flush(&self) {}
+    fn flush(&self) {
+        if self.stdout_enabled {
+            let _ = std::io::stdout().flush();
+        }
+    }
 }
 
 pub fn init_logger(stdout_enabled: bool) {
